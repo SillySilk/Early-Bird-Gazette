@@ -110,9 +110,17 @@ CREATE TRIGGER techniques_au AFTER UPDATE ON techniques BEGIN
 END;
 """
 
+_VEC_V3 = """
+CREATE VIRTUAL TABLE technique_vec USING vec0(
+    technique_id integer primary key,
+    embedding float[384]
+);
+"""
+
 MIGRATIONS: list[tuple[int, str]] = [
     (1, _SCHEMA_V1),
     (2, _FTS_V2),
+    (3, _VEC_V3),
 ]
 
 
