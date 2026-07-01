@@ -196,7 +196,7 @@ def test_vec0_virtual_table_roundtrip():
         (sqlite_vec.serialize_float32([0.1, 0.2, 0.3, 0.4]),),
     )
     rows = conn.execute(
-        "SELECT id, distance FROM t WHERE embedding MATCH ? ORDER BY distance LIMIT 1",
+        "SELECT id, distance FROM t WHERE embedding MATCH ? AND k = 1 ORDER BY distance",
         (sqlite_vec.serialize_float32([0.1, 0.2, 0.3, 0.4]),),
     ).fetchall()
     assert rows[0][0] == 1
@@ -760,7 +760,7 @@ def test_vec_table_knn(db):
     query = sqlite_vec.serialize_float32([0.0] * 384)
     rows = db.execute(
         "SELECT technique_id FROM technique_vec"
-        " WHERE embedding MATCH ? ORDER BY distance LIMIT 1",
+        " WHERE embedding MATCH ? AND k = 1 ORDER BY distance",
         (query,),
     ).fetchall()
     assert rows[0]["technique_id"] == 1
