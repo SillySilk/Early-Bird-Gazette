@@ -231,7 +231,6 @@ git commit -m "test(p1): prove sqlite-vec loading and FTS5 availability"
 
 **Files:**
 - Create: `gazette/storage.py`
-- Modify: `tests/conftest.py`
 - Create: `tests/test_storage.py`
 
 **Interfaces:**
@@ -317,37 +316,19 @@ def connect(db_path: str | os.PathLike, *, read_only: bool = False) -> sqlite3.C
     return conn
 ```
 
-- [ ] **Step 4: Add the shared fixture**
-
-`tests/conftest.py`:
-```python
-import pytest
-
-from gazette.storage import connect
-from gazette.migrations import run_migrations
-
-
-@pytest.fixture
-def db(tmp_path):
-    conn = connect(tmp_path / "gazette.db")
-    run_migrations(conn)
-    yield conn
-    conn.close()
-```
-
-Note: this fixture imports `run_migrations`, added in Task 4. `test_storage.py` does not use the fixture, so run it in isolation until Task 4 lands.
-
-- [ ] **Step 5: Run to verify storage tests pass**
+- [ ] **Step 4: Run to verify storage tests pass**
 
 Run: `.venv/Scripts/python -m pytest tests/test_storage.py -v`
 Expected: 4 passed.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add gazette/storage.py tests/test_storage.py tests/conftest.py
+git add gazette/storage.py tests/test_storage.py
 git commit -m "feat(p1): WAL connection management with sqlite-vec loading"
 ```
+
+Note: `tests/conftest.py` stays empty in this task. The shared `db` fixture (which imports `run_migrations`) is added in Task 5, after `gazette.migrations` exists — adding it here would break pytest collection for the whole suite because `conftest.py` is imported at startup.
 
 ---
 
@@ -459,13 +440,32 @@ Replaces the probe migration with the real schema. Splits FTS5 (Task 6) and vec 
 
 **Files:**
 - Modify: `gazette/migrations.py` (replace `MIGRATIONS`)
+- Modify: `tests/conftest.py` (add the shared `db` fixture)
 - Create: `tests/test_schema.py`
 
 **Interfaces:**
 - Consumes: the Task 4 runner.
-- Produces: migration version `1` creating tables: `domains`, `sources`, `source_items`, `techniques`, `technique_sources`, `tags`, `technique_tags`, `parameters`, `ingest_state`.
+- Produces: migration version `1` creating tables: `domains`, `sources`, `source_items`, `techniques`, `technique_sources`, `tags`, `technique_tags`, `parameters`, `ingest_state`. Also produces the shared pytest `db` fixture (migrated connection on a temp db) used by Tasks 5–9.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Add the shared `db` fixture**
+
+Now that `gazette.migrations` exists (Task 4), add the fixture to `tests/conftest.py`:
+```python
+import pytest
+
+from gazette.storage import connect
+from gazette.migrations import run_migrations
+
+
+@pytest.fixture
+def db(tmp_path):
+    conn = connect(tmp_path / "gazette.db")
+    run_migrations(conn)
+    yield conn
+    conn.close()
+```
+
+- [ ] **Step 2: Write the failing test**
 
 `tests/test_schema.py`:
 ```python
@@ -513,12 +513,12 @@ def test_foreign_keys_enforced(db):
         )
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [ ] **Step 3: Run to verify it fails**
 
 Run: `.venv/Scripts/python -m pytest tests/test_schema.py -v`
 Expected: FAIL (probe schema has no `techniques` table).
 
-- [ ] **Step 3: Replace `MIGRATIONS` in `gazette/migrations.py`**
+- [ ] **Step 4: Replace `MIGRATIONS` in `gazette/migrations.py`**
 
 ```python
 _SCHEMA_V1 = """
@@ -610,16 +610,16 @@ MIGRATIONS: list[tuple[int, str]] = [
 ]
 ```
 
-- [ ] **Step 4: Run schema + migration + storage tests**
+- [ ] **Step 5: Run schema + migration + storage tests**
 
 Run: `.venv/Scripts/python -m pytest tests/test_schema.py tests/test_migrations.py -v`
 Expected: all passed.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add gazette/migrations.py tests/test_schema.py
-git commit -m "feat(p1): core relational schema (migration v1)"
+git add gazette/migrations.py tests/conftest.py tests/test_schema.py
+git commit -m "feat(p1): core relational schema (migration v1) and shared db fixture"
 ```
 
 ---
