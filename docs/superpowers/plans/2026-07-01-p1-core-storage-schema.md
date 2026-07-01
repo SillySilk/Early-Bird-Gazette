@@ -11,6 +11,7 @@
 ## Global Constraints
 
 - Python 3.10 (target interpreter under `C:\AI\Python310`).
+- **All `python`/`pip`/`pytest` commands run through the project virtualenv** created in Task 0: `.venv/Scripts/python -m ...` (Windows). Never install into the global interpreter.
 - Two-package repo layout: `gazette` (core, **no PyQt6 dependency**) and `gazette_app` (PyQt6, not in this plan).
 - **No fallbacks, no dummy data, no placeholders** — a missing required capability (e.g. sqlite-vec fails to load) is a hard error, never a silent fallback to a stub.
 - Every DB connection applies: `PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;`
@@ -22,6 +23,7 @@
 
 ## File Structure
 
+- `.venv/` — project virtualenv (git-ignored).
 - `pyproject.toml` — package metadata + deps for `gazette`.
 - `gazette/__init__.py` — package marker, version.
 - `gazette/storage.py` — `connect()`, extension loading, `run_migrations()`.
@@ -34,6 +36,41 @@
 - `tests/test_schema.py` — schema shape, FTS5 + vec tables.
 - `tests/test_models.py` — model validation.
 - `tests/test_repo.py` — CRUD round-trips.
+
+---
+
+### Task 0: Project virtualenv
+
+**Files:**
+- Create: `.venv/` (via command; git-ignored)
+- Modify: `.gitignore` (ensure `.venv/` is ignored — already present)
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: a project-local Python 3.10 virtualenv at `.venv/` used by every later command as `.venv/Scripts/python`.
+
+- [ ] **Step 1: Create the virtualenv**
+
+Run:
+```bash
+cd "C:/AI/Early Bird Gazette"
+py -3.10 -m venv .venv
+```
+Expected: `.venv/` directory created, no output.
+
+- [ ] **Step 2: Verify the interpreter and upgrade pip**
+
+Run:
+```bash
+.venv/Scripts/python --version
+.venv/Scripts/python -m pip install --upgrade pip
+```
+Expected: `Python 3.10.x`, then pip upgrades successfully.
+
+- [ ] **Step 3: Confirm `.venv/` is git-ignored**
+
+Run: `git check-ignore .venv`
+Expected: prints `.venv` (already covered by the `.gitignore` `.venv/` line). No commit needed — nothing tracked changes.
 
 ---
 
@@ -103,8 +140,8 @@ def test_package_imports():
 Run:
 ```bash
 cd "C:/AI/Early Bird Gazette"
-py -3.10 -m pip install -e ".[dev]"
-py -3.10 -m pytest tests/test_smoke.py -v
+.venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m pytest tests/test_smoke.py -v
 ```
 Expected: PASS (1 passed).
 
@@ -177,7 +214,7 @@ def test_fts5_available():
 
 Run:
 ```bash
-py -3.10 -m pytest tests/test_capabilities.py -v
+.venv/Scripts/python -m pytest tests/test_capabilities.py -v
 ```
 Expected: 3 passed. If `test_can_load_sqlite_vec` errors with "not authorized" / disabled extension loading, or `test_fts5_available` errors with "no such module: fts5" — STOP and report; do not proceed to Task 3.
 
@@ -241,7 +278,7 @@ def test_read_only_rejects_writes(tmp_path):
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `py -3.10 -m pytest tests/test_storage.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_storage.py -v`
 Expected: FAIL (ModuleNotFoundError: gazette.storage).
 
 - [ ] **Step 3: Implement `gazette/storage.py`**
@@ -302,7 +339,7 @@ Note: this fixture imports `run_migrations`, added in Task 4. `test_storage.py` 
 
 - [ ] **Step 5: Run to verify storage tests pass**
 
-Run: `py -3.10 -m pytest tests/test_storage.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_storage.py -v`
 Expected: 4 passed.
 
 - [ ] **Step 6: Commit**
@@ -354,7 +391,7 @@ def test_schema_migrations_table_records_versions(tmp_path):
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `py -3.10 -m pytest tests/test_migrations.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_migrations.py -v`
 Expected: FAIL (ModuleNotFoundError: gazette.migrations).
 
 - [ ] **Step 3: Implement the runner (schema SQL comes in Task 5)**
@@ -404,7 +441,7 @@ MIGRATIONS: list[tuple[int, str]] = [
 
 - [ ] **Step 5: Run to verify migration tests pass**
 
-Run: `py -3.10 -m pytest tests/test_migrations.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_migrations.py -v`
 Expected: 2 passed.
 
 - [ ] **Step 6: Commit**
@@ -478,7 +515,7 @@ def test_foreign_keys_enforced(db):
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `py -3.10 -m pytest tests/test_schema.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_schema.py -v`
 Expected: FAIL (probe schema has no `techniques` table).
 
 - [ ] **Step 3: Replace `MIGRATIONS` in `gazette/migrations.py`**
@@ -575,7 +612,7 @@ MIGRATIONS: list[tuple[int, str]] = [
 
 - [ ] **Step 4: Run schema + migration + storage tests**
 
-Run: `py -3.10 -m pytest tests/test_schema.py tests/test_migrations.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_schema.py tests/test_migrations.py -v`
 Expected: all passed.
 
 - [ ] **Step 5: Commit**
@@ -638,7 +675,7 @@ def test_fts_reflects_delete(db):
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `py -3.10 -m pytest tests/test_fts.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_fts.py -v`
 Expected: FAIL (no such table: techniques_fts).
 
 - [ ] **Step 3: Append migration `2` to `MIGRATIONS`**
@@ -678,7 +715,7 @@ MIGRATIONS: list[tuple[int, str]] = [
 
 - [ ] **Step 4: Run to verify FTS tests pass**
 
-Run: `py -3.10 -m pytest tests/test_fts.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_fts.py -v`
 Expected: 3 passed.
 
 - [ ] **Step 5: Commit**
@@ -731,7 +768,7 @@ def test_vec_table_knn(db):
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `py -3.10 -m pytest tests/test_vec.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_vec.py -v`
 Expected: FAIL (no such module/table: technique_vec).
 
 - [ ] **Step 3: Append migration `3`**
@@ -756,7 +793,7 @@ Note: dimension 384 matches the global-constraint default. A future migration wi
 
 - [ ] **Step 4: Run to verify vec test passes**
 
-Run: `py -3.10 -m pytest tests/test_vec.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_vec.py -v`
 Expected: 1 passed.
 
 - [ ] **Step 5: Commit**
@@ -817,7 +854,7 @@ def test_parameter_and_rawrecord():
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `py -3.10 -m pytest tests/test_models.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_models.py -v`
 Expected: FAIL (ModuleNotFoundError: gazette.models).
 
 - [ ] **Step 3: Implement `gazette/models.py`**
@@ -862,7 +899,7 @@ class Technique(BaseModel):
 
 - [ ] **Step 4: Run to verify models tests pass**
 
-Run: `py -3.10 -m pytest tests/test_models.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_models.py -v`
 Expected: 3 passed.
 
 - [ ] **Step 5: Commit**
@@ -949,7 +986,7 @@ def test_get_missing_technique_returns_none(db):
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `py -3.10 -m pytest tests/test_repo.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_repo.py -v`
 Expected: FAIL (ModuleNotFoundError: gazette.repo).
 
 - [ ] **Step 3: Implement `gazette/repo.py`**
@@ -1074,12 +1111,12 @@ def get_technique(conn, technique_id: int) -> Technique | None:
 
 - [ ] **Step 4: Run to verify repo tests pass**
 
-Run: `py -3.10 -m pytest tests/test_repo.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_repo.py -v`
 Expected: 4 passed.
 
 - [ ] **Step 5: Run the full suite**
 
-Run: `py -3.10 -m pytest -v`
+Run: `.venv/Scripts/python -m pytest -v`
 Expected: all tests pass.
 
 - [ ] **Step 6: Commit**
