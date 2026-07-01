@@ -26,7 +26,7 @@ def get_or_create_tag(conn: sqlite3.Connection, name: str, tag_type: str | None 
     return cur.lastrowid
 
 
-def insert_source(conn, type: str, name: str, url: str | None = None,
+def insert_source(conn: sqlite3.Connection, type: str, name: str, url: str | None = None,
                   config_ref: str | None = None) -> int:
     cur = conn.execute(
         "INSERT INTO sources(type, name, url, config_ref) VALUES (?, ?, ?, ?)",
@@ -35,7 +35,7 @@ def insert_source(conn, type: str, name: str, url: str | None = None,
     return cur.lastrowid
 
 
-def insert_source_item(conn, source_id: int, external_id: str, raw_text: str,
+def insert_source_item(conn: sqlite3.Connection, source_id: int, external_id: str, raw_text: str,
                        content_hash: str, url: str | None = None,
                        author: str | None = None) -> int:
     cur = conn.execute(
@@ -46,15 +46,10 @@ def insert_source_item(conn, source_id: int, external_id: str, raw_text: str,
     return cur.lastrowid
 
 
-def insert_technique(conn, tech: Technique, *, embedding: list[float] | None = None,
-                     source_item_ids: list[int] = []) -> int:
-    # Close any implicit transaction opened by prior statements on this
-    # connection (Python's sqlite3 auto-begins before DML), so the explicit
-    # BEGIN IMMEDIATE below does not fail with "cannot start a transaction
-    # within a transaction".
-    if conn.in_transaction:
-        conn.commit()
-    conn.execute("BEGIN IMMEDIATE")
+def insert_technique(conn: sqlite3.Connection, tech: Technique, *, embedding: list[float] | None = None,
+                     source_item_ids: list[int] | None = None) -> int:
+    source_item_ids = source_item_ids or []
+    conn.execute("SAVEPOINT insert_technique")
     try:
         domain_id = get_or_create_domain(conn, tech.domain)
         cur = conn.execute(
@@ -87,14 +82,15 @@ def insert_technique(conn, tech: Technique, *, embedding: list[float] | None = N
                 "INSERT INTO technique_vec(technique_id, embedding) VALUES (?, ?)",
                 (tid, sqlite_vec.serialize_float32(embedding)),
             )
-        conn.commit()
+        conn.execute("RELEASE insert_technique")
     except Exception:
-        conn.rollback()
+        conn.execute("ROLLBACK TO insert_technique")
+        conn.execute("RELEASE insert_technique")
         raise
     return tid
 
 
-def get_technique(conn, technique_id: int) -> Technique | None:
+def get_technique(conn: sqlite3.Connection, technique_id: int) -> Technique | None:
     row = conn.execute(
         "SELECT t.*, d.name AS domain_name FROM techniques t"
         " JOIN domains d ON d.id = t.domain_id WHERE t.id = ?",

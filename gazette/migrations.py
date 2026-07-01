@@ -139,10 +139,21 @@ def run_migrations(conn: sqlite3.Connection) -> int:
     for version, sql in sorted(MIGRATIONS):
         if version <= start:
             continue
-        with conn:  # transaction
-            conn.executescript(sql)
-            conn.execute(
-                "INSERT INTO schema_migrations(version) VALUES (?)", (version,)
+        # executescript() first commits any pending work, then runs the
+        # script, ignoring isolation_level -- so transaction control must live
+        # inside the script. Wrapping the DDL and the version bump in an
+        # explicit BEGIN/COMMIT makes each migration atomic: SQLite supports
+        # transactional DDL, so a failure partway through rolls the whole
+        # migration back and no schema_migrations row is recorded.
+        try:
+            conn.executescript(
+                "BEGIN;\n"
+                f"{sql}\n"
+                f"INSERT INTO schema_migrations(version) VALUES ({version});\n"
+                "COMMIT;"
             )
+        except Exception:
+            conn.rollback()
+            raise
         applied += 1
     return applied

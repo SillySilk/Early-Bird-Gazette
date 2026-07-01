@@ -1,3 +1,7 @@
+import sqlite3
+
+import pytest
+
 from gazette.models import Technique, Parameter
 from gazette import repo
 
@@ -50,10 +54,6 @@ def test_get_missing_technique_returns_none(db):
 
 
 def test_insert_technique_rolls_back_on_error(db):
-    import sqlite3
-
-    import pytest
-
     tech = Technique(
         title="Rollback probe", summary="s", body="b", domain="SD",
         dedup_key="kbad", confidence=0.5,
@@ -73,3 +73,28 @@ def test_insert_technique_rolls_back_on_error(db):
         "SELECT COUNT(*) FROM techniques_fts WHERE techniques_fts MATCH 'rollback'"
     ).fetchone()[0] == 0
     assert db.execute("SELECT COUNT(*) FROM technique_vec").fetchone()[0] == 0
+
+
+def test_insert_technique_composes_in_outer_transaction(db):
+    # Two inserts inside one caller-managed transaction; rolling the outer
+    # transaction back must discard BOTH (proves insert_technique nests via
+    # SAVEPOINT and does not force-commit the caller's work).
+    t1 = Technique(title="First", summary="s", body="b", domain="SD",
+                   dedup_key="c1", confidence=0.5)
+    t2 = Technique(title="Second", summary="s", body="b", domain="SD",
+                   dedup_key="c2", confidence=0.5)
+    db.execute("BEGIN")
+    repo.insert_technique(db, t1, embedding=[0.0] * 384)
+    repo.insert_technique(db, t2, embedding=[0.1] * 384)
+    db.execute("ROLLBACK")
+    assert db.execute("SELECT COUNT(*) FROM techniques").fetchone()[0] == 0
+    assert db.execute("SELECT COUNT(*) FROM technique_vec").fetchone()[0] == 0
+
+
+def test_domain_meta_roundtrips_non_empty(db):
+    tech = Technique(title="Meta", summary="s", body="b", domain="SD",
+                     dedup_key="cm", confidence=0.7,
+                     domain_meta={"base_model": "Anima", "steps": 30})
+    tid = repo.insert_technique(db, tech, embedding=[0.0] * 384)
+    got = repo.get_technique(db, tid)
+    assert got.domain_meta == {"base_model": "Anima", "steps": 30}

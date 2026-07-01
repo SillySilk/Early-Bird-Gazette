@@ -1,3 +1,7 @@
+import sqlite3
+
+import pytest
+
 EXPECTED_TABLES = {
     "domains", "sources", "source_items", "techniques",
     "technique_sources", "tags", "technique_tags", "parameters",
@@ -33,8 +37,6 @@ def test_status_defaults_to_published(db):
 
 
 def test_foreign_keys_enforced(db):
-    import sqlite3
-    import pytest
     with pytest.raises(sqlite3.IntegrityError):
         db.execute(
             "INSERT INTO techniques(title, summary, body, domain_id, dedup_key, confidence)"
