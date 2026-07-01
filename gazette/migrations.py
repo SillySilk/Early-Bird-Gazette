@@ -86,8 +86,33 @@ CREATE INDEX idx_techniques_cluster ON techniques(cluster_id);
 CREATE INDEX idx_source_items_source ON source_items(source_id);
 """
 
+_FTS_V2 = """
+CREATE VIRTUAL TABLE techniques_fts USING fts5(
+    title, summary, body,
+    content='techniques', content_rowid='id'
+);
+
+CREATE TRIGGER techniques_ai AFTER INSERT ON techniques BEGIN
+    INSERT INTO techniques_fts(rowid, title, summary, body)
+    VALUES (new.id, new.title, new.summary, new.body);
+END;
+
+CREATE TRIGGER techniques_ad AFTER DELETE ON techniques BEGIN
+    INSERT INTO techniques_fts(techniques_fts, rowid, title, summary, body)
+    VALUES ('delete', old.id, old.title, old.summary, old.body);
+END;
+
+CREATE TRIGGER techniques_au AFTER UPDATE ON techniques BEGIN
+    INSERT INTO techniques_fts(techniques_fts, rowid, title, summary, body)
+    VALUES ('delete', old.id, old.title, old.summary, old.body);
+    INSERT INTO techniques_fts(rowid, title, summary, body)
+    VALUES (new.id, new.title, new.summary, new.body);
+END;
+"""
+
 MIGRATIONS: list[tuple[int, str]] = [
     (1, _SCHEMA_V1),
+    (2, _FTS_V2),
 ]
 
 
