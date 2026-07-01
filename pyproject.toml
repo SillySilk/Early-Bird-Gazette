@@ -1,0 +1,22 @@
+[project]
+name = "gazette"
+version = "0.1.0"
+description = "Early Bird Gazette core library"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.5",
+    "sqlite-vec>=0.1.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["gazette*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
