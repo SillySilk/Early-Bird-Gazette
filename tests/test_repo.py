@@ -47,3 +47,29 @@ def test_insert_technique_writes_fts_and_vec(db):
 
 def test_get_missing_technique_returns_none(db):
     assert repo.get_technique(db, 999) is None
+
+
+def test_insert_technique_rolls_back_on_error(db):
+    import sqlite3
+
+    import pytest
+
+    tech = Technique(
+        title="Rollback probe", summary="s", body="b", domain="SD",
+        dedup_key="kbad", confidence=0.5,
+        tags=["rbtag"], parameters=[Parameter(key="k", value="v")],
+    )
+    # source_item_id 999 does not exist -> FK violation on technique_sources,
+    # after the technique/tags/parameters rows have been inserted in-transaction.
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.insert_technique(db, tech, embedding=[0.0] * 384, source_item_ids=[999])
+
+    assert db.execute(
+        "SELECT COUNT(*) FROM techniques WHERE dedup_key='kbad'"
+    ).fetchone()[0] == 0
+    assert db.execute("SELECT COUNT(*) FROM parameters").fetchone()[0] == 0
+    assert db.execute("SELECT COUNT(*) FROM technique_tags").fetchone()[0] == 0
+    assert db.execute(
+        "SELECT COUNT(*) FROM techniques_fts WHERE techniques_fts MATCH 'rollback'"
+    ).fetchone()[0] == 0
+    assert db.execute("SELECT COUNT(*) FROM technique_vec").fetchone()[0] == 0
