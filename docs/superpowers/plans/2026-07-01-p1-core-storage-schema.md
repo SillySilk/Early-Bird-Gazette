@@ -994,6 +994,7 @@ Expected: FAIL (ModuleNotFoundError: gazette.repo).
 ```python
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import sqlite_vec
@@ -1041,10 +1042,15 @@ def insert_source_item(conn, source_id: int, external_id: str, raw_text: str,
 
 def insert_technique(conn, tech: Technique, *, embedding: list[float] | None = None,
                      source_item_ids: list[int] = []) -> int:
-    with conn:
-        conn.execute("BEGIN IMMEDIATE")
+    # Close any implicit transaction opened by prior statements on this
+    # connection (Python's sqlite3 auto-begins before DML), so the explicit
+    # BEGIN IMMEDIATE below does not fail with "cannot start a transaction
+    # within a transaction".
+    if conn.in_transaction:
+        conn.commit()
+    conn.execute("BEGIN IMMEDIATE")
+    try:
         domain_id = get_or_create_domain(conn, tech.domain)
-        import json
         cur = conn.execute(
             "INSERT INTO techniques(title, summary, body, domain_id, dedup_key,"
             " cluster_id, confidence, is_actionable, status, domain_meta)"
@@ -1075,6 +1081,10 @@ def insert_technique(conn, tech: Technique, *, embedding: list[float] | None = N
                 "INSERT INTO technique_vec(technique_id, embedding) VALUES (?, ?)",
                 (tid, sqlite_vec.serialize_float32(embedding)),
             )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     return tid
 
 
@@ -1099,7 +1109,6 @@ def get_technique(conn, technique_id: int) -> Technique | None:
             (technique_id,),
         ).fetchall()
     ]
-    import json
     return Technique(
         id=row["id"], title=row["title"], summary=row["summary"], body=row["body"],
         domain=row["domain_name"], dedup_key=row["dedup_key"],
